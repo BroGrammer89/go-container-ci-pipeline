@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: likando/go-version-app:0.1.0
+    ports:
+      - "8080:3000"
+      - "8443:8443"
+    environment:
+      VERSION: "0.1.0"
+      TLS_CERT_PATH: "/certs/tls.crt"
+      TLS_KEY_PATH: "/certs/tls.key"
+    volumes:
+      - ./certs:/certs:ro
+    restart: unless-stopped
