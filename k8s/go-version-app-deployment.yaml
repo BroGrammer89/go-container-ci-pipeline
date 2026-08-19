@@ -20,7 +20,7 @@ spec:
         runAsGroup: 65532
       containers:
         - name: go-version-app
-          image: likando/go-version-app:0.1.0
+          image: ghcr.io/brogrammer89/go-container-delivery-pipeline:634f20ba6cb53bc38016f8ad8bbf66d04f0dd7d5
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
