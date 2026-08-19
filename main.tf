@@ -46,8 +46,13 @@ variable "container_port" {
 }
 
 variable "image_tag" {
-  description = "Tag of the image already pushed to ECR by GitLab CI"
-  default     = "latest"
+  description = "Immutable tag of an image pushed separately to the Terraform-managed ECR repository"
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.image_tag)) > 0 && var.image_tag != "latest"
+    error_message = "image_tag must be a non-empty immutable tag and must not be latest."
+  }
 }
 
 ##############################################

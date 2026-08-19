@@ -1,12 +1,14 @@
-# go-version-app
+# Go Container CI Pipeline
 
-A lightweight Go service that returns the `VERSION` environment variable, packaged for Docker, Docker Compose, Kubernetes, GitHub Actions, Terraform, and TLS-enabled local development.
+A lightweight Go service used to demonstrate hardened container builds,
+GitHub Actions continuous integration, immutable GHCR image publishing,
+pull-after-push smoke testing, and security-conscious local runtime manifests.
 
 ## What this repository demonstrates
 
 - Dockerized Go application
 - Docker Compose local runtime
-- GitHub Actions CI/CD that builds, publishes, and smoke-tests the container image
+- GitHub Actions CI that builds, publishes, pulls, and smoke-tests the container image
 - Kubernetes deployment with four replicas and local access
 - Terraform baseline for supporting infrastructure
 - HTTPS/TLS support with self-signed certificates for local testing
@@ -78,11 +80,11 @@ docker compose down
 |---|---|---|
 | Dockerized application | Implemented | [Dockerfile](Dockerfile), [src/go-version-app.go](src/go-version-app.go) |
 | Docker Compose runtime | Implemented | [docker-compose.yml](docker-compose.yml) |
-| GitHub Actions CI/CD and image publishing | Implemented | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
+| GitHub Actions CI and GHCR image publishing | Implemented | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
 | Kubernetes deployment with four replicas | Implemented | [k8s/go-version-app-deployment.yaml](k8s/go-version-app-deployment.yaml), [k8s/go-version-app-service.yaml](k8s/go-version-app-service.yaml) |
 | Infrastructure as Code | Baseline implemented | [main.tf](main.tf) |
 | HTTPS/TLS | Local self-signed configuration implemented | [src/go-version-app.go](src/go-version-app.go), [docker-compose.yml](docker-compose.yml) |
-| Security hardening | Baseline implemented | Docker, Kubernetes, TLS, and CI/CD sections below |
+| Security hardening | Baseline implemented | Docker, Kubernetes, TLS, and CI sections below |
 
 ## Implementation details
 
@@ -94,15 +96,33 @@ docker compose down
 - Non-root runtime user
 - Compose service definition in [docker-compose.yml](docker-compose.yml)
 
-### GitHub Actions CI/CD
+### GitHub Actions CI
 
-The GitHub Actions workflow runs on changes to `main` and performs the following steps:
+The GitHub Actions workflow runs on changes to `main`. It performs continuous
+integration and artifact publication; it does not deploy the application to
+Kubernetes or ECS.
+
+The workflow:
 
 - build the Docker image
-- authenticate to a container registry
-- publish an image tagged from the commit SHA
-- run the application in a container
-- use `curl` to verify the HTTP endpoint returns successfully
+- authenticates to GitHub Container Registry with the repository-scoped
+  `GITHUB_TOKEN`
+- publishes an immutable image tag derived from the full Git commit SHA
+- removes the locally built image and pulls the published image from GHCR
+- runs the pulled artifact in a container
+- uses `curl` to verify both the HTTP response and injected short commit SHA
+
+For commit `634f20ba6cb53bc38016f8ad8bbf66d04f0dd7d5`, the published
+artifact is:
+
+```text
+ghcr.io/brogrammer89/go-container-delivery-pipeline:634f20ba6cb53bc38016f8ad8bbf66d04f0dd7d5
+```
+
+The image is stored remotely as a GitHub package. Because the workflow uses a
+self-hosted runner, the pull-after-push copy also appears in Docker Desktop on
+the runner machine. It is a registry artifact, not a GitHub Actions
+`upload-artifact` file.
 
 Workflow definition: [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
@@ -114,6 +134,7 @@ Files:
 
 Implemented:
 - 4 replicas
+- the exact GHCR image produced and smoke-tested by the CI workflow
 - resource requests and limits to provide basic CPU/memory guardrails
 - NodePort service for local access without port-forward
 - pod-level non-root security context
@@ -147,6 +168,9 @@ Terraform baseline in [main.tf](main.tf) includes:
 
 Scope note:
 - This is intentionally minimal, sized for a proof-of-concept.
+- The Terraform configuration is a separate ECS infrastructure example. The
+  GitHub Actions workflow does not push to its ECR repository or deploy ECS.
+- `image_tag` must be supplied as an immutable ECR tag; `latest` is rejected.
 - Production hardening would include finalized remote state backend and more stable ingress.
 
 ### HTTPS/TLS
@@ -176,7 +200,7 @@ Security controls implemented:
 Security reasoning:
 
 - non-root and minimal runtime reduce attack surface
-- codified build/deploy paths reduce manual drift
+- codified build and runtime definitions reduce manual drift
 - TLS path demonstrates transport-security readiness in local environments
 
 Known limitations and next steps:
@@ -194,11 +218,15 @@ Validated locally:
 - HTTPS local response using self-signed certificate
 - Kubernetes deployment/service baseline behavior, including the internal curl-pod test without port-forwarding
 
-The CI/CD workflow validates:
+The CI workflow validates:
 
 - Docker image build
-- Container image publishing with a commit SHA tag
-- HTTP smoke test of the running application
+- GHCR image publishing with a full commit SHA tag
+- removal and re-pull of the published registry artifact
+- HTTP smoke test of the running artifact
+
+The workflow does not perform continuous deployment. Kubernetes and Terraform
+remain separately invoked runtime examples.
 
 Kubernetes validation details:
 
